@@ -1,24 +1,27 @@
-from flask import Flask, escape, request, jsonify
 import redis
 import time
+import json
 
-app = Flask(__name__)
+REDIS_POSTS_QUEUE = 'POSTS_QUEUE'
 
-
-cache = redis.Redis(host='redis', port=6379)
+redis_client = redis.Redis(host='redis', port=6379)
 
 
 def store_count(subreddit):
     """
     Store number of posts for each subreddit.
     """
-    return cache.incr("subreddit-{}".format(subreddit))
+    return redis_client.incr("subreddit-{}".format(subreddit))
 
 
-@app.route('/posts', methods=['POST'])
 def consume_posts():
-    data = request.json
-    subreddit = data['subreddit']
-    print(f'Received a post from {subreddit}')
-    store_count(subreddit)
-    return jsonify({'success': True})
+    data = redis_client.rpop(REDIS_POSTS_QUEUE)
+    if data:
+        subreddit = json.loads(data)['subreddit']
+        print(f'Received a post from {subreddit}')
+        store_count(subreddit)
+
+
+if __name__ == '__main__':
+    while True:
+        consume_posts()

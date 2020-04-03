@@ -1,21 +1,17 @@
 from config import reddit
-import requests
+import redis
 import json
 import time
 
 all_ = reddit.subreddit('all')
-publish_url = 'http://consumer:5000/posts'
+redis_client = redis.Redis(host='redis', port=6379)
+REDIS_POSTS_QUEUE = 'POSTS_QUEUE'
 
 def publish(data):
 	"""
-	Post data to a consumer api.
+	Post data to a Redis queue.
 	"""
-	response = requests.post(
-		publish_url, 
-		data=json.dumps(data), 
-		headers={'content-type':'application/json'}
-	)
-	return response
+	redis_client.lpush(REDIS_POSTS_QUEUE, json.dumps(data))
 
 
 def read():
@@ -27,7 +23,9 @@ def read():
 		# Let's start with publishing 
 		# just the subreddit name
 		if count > 100: break
-		data = {'subreddit': post.subreddit.display_name}
+		data = {
+			'subreddit': post.subreddit.display_name
+		}
 		publish(data)
 		print(f'Published {count+1} posts.')
 		count += 1
